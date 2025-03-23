@@ -46,8 +46,11 @@ def main(config):
 
     for epoch in tqdm(range(num_epochs), desc="Epochs"):
         global_step = train(model, train_loader, optimizer, scheduler, device, config.num_steps, global_step)
-        metrics = evaluate(model, val_loader, device, epoch)
-        val_accuracies.append(metrics["validation/accuracy"])
+        metrics_val = evaluate(model, val_loader, device, epoch)
+        val_accuracies.append(metrics_val["validation/accuracy"])
+
+
+
         if global_step >= config.num_steps:
             break
 
@@ -77,7 +80,6 @@ def train(model, train_loader, optimizer, scheduler, device, num_steps, global_s
             "training/loss": loss.item(),
             "step": global_step
         }
-        print(metrics)
 
         if global_step >= num_steps:
             break
@@ -110,7 +112,6 @@ def evaluate(model, val_loader, device, epoch):
         "validation/loss": avg_loss,
         "epoch": epoch
     }
-    print(metrics)
     return metrics  # Return the metrics so you can track accuracy
 
 
