@@ -6,6 +6,9 @@ import argparse
 from data import get_data
 from model import Transformer
 
+import matplotlib.pyplot as plt
+import os
+
 def main(config):
     device = torch.device(config.device)
 
@@ -39,12 +42,17 @@ def main(config):
 
     num_epochs = ceil(config.num_steps / len(train_loader))
     global_step = 0
+    val_accuracies = []  # To store validation accuracy per epoch
 
     for epoch in tqdm(range(num_epochs), desc="Epochs"):
         global_step = train(model, train_loader, optimizer, scheduler, device, config.num_steps, global_step)
-        evaluate(model, val_loader, device, epoch)
+        metrics = evaluate(model, val_loader, device, epoch)
+        val_accuracies.append(metrics["validation/accuracy"])
         if global_step >= config.num_steps:
             break
+
+    # After training, plot the validation accuracy over epochs
+    plot_accuracy(val_accuracies, config)
 
 def train(model, train_loader, optimizer, scheduler, device, num_steps, global_step):
     model.train()
@@ -103,5 +111,23 @@ def evaluate(model, val_loader, device, epoch):
         "epoch": epoch
     }
     print(metrics)
+    return metrics  # Return the metrics so you can track accuracy
 
 
+
+def plot_accuracy(accuracies, config):
+    # Ensure the results folder exists
+    os.makedirs('results', exist_ok=True)
+    
+    plt.figure(figsize=(8, 6))
+    plt.plot(range(len(accuracies)), accuracies, marker='o')
+    plt.xlabel('Epoch')
+    plt.ylabel('Validation Accuracy')
+    plt.title(f'Accuracy over Epochs\nOperation: {config.operation}, Prime: {config.prime}')
+    plt.grid(True)
+    
+    # Save the plot with a filename that includes the parameters
+    save_path = os.path.join('results', f"accuracy_plot_{config.operation}_{config.prime}.png")
+    plt.savefig(save_path)
+    plt.close()
+    print(f"Accuracy plot saved to {save_path}")
