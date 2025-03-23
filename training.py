@@ -134,6 +134,9 @@ def plot_accuracy(accuracies, config):
     plt.ylabel('Validation Accuracy')
     plt.title(f'Accuracy over Epochs\nOperation: {config.operation}, Prime: {config.prime}')
     plt.grid(True)
+
+    # Ensure the results folder exists
+    os.makedirs('results', exist_ok=True)
     
     # Save the plot with a filename that includes the parameters
     save_path = os.path.join('results', f"accuracy_plot_{config.operation}_{config.prime}.png")
