@@ -130,15 +130,29 @@ def evaluate(model, val_loader, device, epoch):
     }
     return metrics
 
-def plot_accuracy(train_accuracies, val_accuracies, config):
+def plot_accuracy(train_accuracies, val_accuracies, config, smoothing_factor=0.9):
+    def smooth_curve(points, factor):
+        smoothed = []
+        for point in points:
+            if smoothed:
+                smoothed.append(smoothed[-1] * factor + point * (1 - factor))
+            else:
+                smoothed.append(point)
+        return smoothed
+
+    # Smooth the curves
+    smoothed_train = smooth_curve(train_accuracies, smoothing_factor)
+    smoothed_val = smooth_curve(val_accuracies, smoothing_factor)
+
     # Ensure the results folder exists
     os.makedirs('results', exist_ok=True)
     
     plt.figure(figsize=(8, 6))
-    epochs = range(len(train_accuracies))
-    plt.plot(epochs, train_accuracies, color='red', label="Training Accuracy")
-    plt.plot(epochs, val_accuracies, color='green', label="Validation Accuracy")
-    plt.xlabel('Epoch')
+    steps = range(len(smoothed_train))
+    # Plot with both line and marker for a smoother yet discrete representation.
+    plt.plot(steps, smoothed_train, linestyle='-', color='red', label="Training Accuracy")
+    plt.plot(steps, smoothed_val, linestyle='-', color='green', label="Validation Accuracy")
+    plt.xlabel('Epochs')
     plt.ylabel('Accuracy')
     plt.title(f'Accuracy over Epochs\nOperation: {config.operation}, Prime: {config.prime}')
     plt.legend()
