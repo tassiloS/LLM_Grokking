@@ -1,5 +1,28 @@
 from math import ceil
 import torch
+import re
+
+def mod_pow_tensor(y, exp, mod):
+    """
+    Compute y^exp (mod mod) elementwise using exponentiation by squaring.
+    Assumes y is a torch tensor of integers.
+    """
+    result = torch.ones_like(y)
+    base = y % mod
+    while exp > 0:
+        if exp % 2 == 1:
+            result = (result * base) % mod
+        base = (base * base) % mod
+        exp //= 2
+    return result
+
+def mod_div(x, y, p):
+    """
+    Compute x/y (mod p) as x * (y^(p-2)) mod p.
+    Uses Fermat's Little Theorem (p is prime) to compute the inverse of y.
+    """
+    inv_y = mod_pow_tensor(y, p-2, p)
+    return (x * inv_y) % p
 
 def generate_operation_func(operation: str):
     """
@@ -7,18 +30,27 @@ def generate_operation_func(operation: str):
     The returned function takes tensors x, y, and an integer p, and returns (x, y, result),
     where result is computed by evaluating the given operation string in a restricted environment.
     After evaluation, the result is reduced modulo p so that it is in the range [0, p).
+
+    In our implementation:
+      - The "/" operator in the operation string is interpreted as modular division (x/y mod p).
+      - The "//" operator is left as the usual integer (Euclidean) division.
     """
     def op_func(x, y, p):
+        # Preprocess the operation string:
+        # Replace every occurrence of a single "/" (not part of a "//") with a call to mod_div.
+        # The regex matches two tokens separated by a "/" and replaces with: mod_div(token1, token2, p)
+        op_str = re.sub(r'(?<!/)(\S+)\s*/\s*(\S+)(?!/)', r'mod_div(\1, \2, p)', operation)
         env = {
             'x': x,
             'y': y,
             'p': p,
             'torch': torch,
             'min': torch.minimum,
-            'max': torch.maximum
+            'max': torch.maximum,
+            'mod_div': mod_div
         }
-        result = eval(operation, {"__builtins__": {}}, env)
-        # Reduce the result modulo p so that the labels are in the range [0, p)
+        result = eval(op_str, {"__builtins__": {}}, env)
+        # Reduce the result modulo p so that the result is in the range [0, p)
         result = result % p
         return x, y, result
     return op_func

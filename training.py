@@ -159,6 +159,10 @@ def plot_accuracy(train_accuracies, val_accuracies, config, smoothing_factor=0.9
     plt.grid(True)
     
     # Save the plot with a filename that includes the parameters
+    if "//" in config.operation:
+        config.operation = config.operation.replace("//", "_euc_div_")
+    if "/" in config.operation:
+        config.operation = config.operation.replace("/", "_mod_div_")
     save_path = os.path.join('results', f"accuracy_plot_{config.operation}_{config.prime}.png")
     plt.savefig(save_path)
     plt.close()
