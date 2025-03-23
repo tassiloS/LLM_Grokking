@@ -1,11 +1,13 @@
 from argparse import ArgumentParser
-
-from data import ALL_OPERATIONS
 from training import main
+import torch
 
 if __name__ == "__main__":
+
+    default_device = "cuda" if torch.cuda.is_available() else ("mps" if hasattr(torch.backends, "mps") and torch.backends.mps.is_available() else "cpu")
+
     parser = ArgumentParser()
-    parser.add_argument("--operation", type=str, choices=ALL_OPERATIONS.keys(), default="x/y")
+    parser.add_argument("--operation", type=str, default="x/y")
     parser.add_argument("--training_fraction", type=float, default=0.5)
     parser.add_argument("--prime", type=int, default=97)
     parser.add_argument("--num_layers", type=int, default=2)

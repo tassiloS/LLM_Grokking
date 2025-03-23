@@ -19,6 +19,14 @@ def main(config):
         config.training_fraction,
         config.batch_size
     )
+    
+    # Print an example data sample before training
+    example_inputs, example_labels = next(iter(train_loader))
+    # Inputs are of the form [x, op_token, y, eq_token]
+    example_x = example_inputs[0, 0].item()
+    example_y = example_inputs[0, 2].item()
+    example_result = example_labels[0].item()
+    print(f'operation: "{config.operation}", example: x={example_x}, y={example_y}, {config.operation} = {example_result}')
 
     # Initialize the model
     model = Transformer(
