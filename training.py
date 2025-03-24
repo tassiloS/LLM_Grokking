@@ -154,7 +154,7 @@ def plot_accuracy(train_accuracies, val_accuracies, config, smoothing_factor=0.9
     plt.plot(steps, smoothed_val, linestyle='-', color='green', label="Validation Accuracy")
     plt.xlabel('Epochs')
     plt.ylabel('Accuracy')
-    plt.title(f'Accuracy over Epochs\nOperation: {config.operation}, Prime: {config.prime}')
+    plt.title(f'Accuracy over Epochs\nOperation: {config.operation}, Prime: {config.prime}, Training Fraction: {config.training_fraction}')
     plt.legend()
     plt.grid(True)
     
@@ -163,7 +163,7 @@ def plot_accuracy(train_accuracies, val_accuracies, config, smoothing_factor=0.9
         config.operation = config.operation.replace("//", "_euc_div_")
     if "/" in config.operation:
         config.operation = config.operation.replace("/", "_mod_div_")
-    save_path = os.path.join('results', f"accuracy_plot_{config.operation}_{config.prime}.png")
+    save_path = os.path.join('results', f"accuracy_plot_{config.operation}_{config.prime}_{config.training_fraction}.png")
     plt.savefig(save_path)
     plt.close()
     print(f"Accuracy plot saved to {save_path}")

@@ -27,74 +27,97 @@ def mod_div(x, y, p):
 def generate_operation_func(operation: str):
     """
     Returns a function that computes a custom operation.
-    The returned function takes tensors x, y, and an integer p, and returns (x, y, result),
-    where result is computed by evaluating the given operation string in a restricted environment.
-    After evaluation, the result is reduced modulo p so that it is in the range [0, p).
-
+    If the operation string contains 'z', the returned function will expect three components.
+    Otherwise, it will expect two components.
+    
     In our implementation:
-      - The "/" operator in the operation string is interpreted as modular division (x/y mod p).
-      - The "//" operator is left as the usual integer (Euclidean) division.
+      - The "/" operator is interpreted as modular division via mod_div.
+      - The "//" operator is left as usual integer division.
     """
-    def op_func(x, y, p):
-        # Preprocess the operation string:
-        # Replace every occurrence of a single "/" (not part of a "//") with a call to mod_div.
-        # The regex matches two tokens separated by a "/" and replaces with: mod_div(token1, token2, p)
-        op_str = re.sub(r'(?<!/)(\S+)\s*/\s*(\S+)(?!/)', r'mod_div(\1, \2, p)', operation)
-        env = {
-            'x': x,
-            'y': y,
-            'p': p,
-            'torch': torch,
-            'min': torch.minimum,
-            'max': torch.maximum,
-            'mod_div': mod_div
-        }
-        result = eval(op_str, {"__builtins__": {}}, env)
-        # Reduce the result modulo p so that the result is in the range [0, p)
-        result = result % p
-        return x, y, result
-    return op_func
+    if 'z' in operation:
+        def op_func(x, y, z, p):
+            op_str = re.sub(r'(?<!/)(\S+)\s*/\s*(\S+)(?!/)', r'mod_div(\1, \2, p)', operation)
+            env = {
+                'x': x,
+                'y': y,
+                'z': z,
+                'p': p,
+                'torch': torch,
+                'min': torch.minimum,
+                'max': torch.maximum,
+                'mod_div': mod_div
+            }
+            result = eval(op_str, {"__builtins__": {}}, env)
+            result = result % p
+            return x, y, z, result
+        return op_func
+    else:
+        def op_func(x, y, p):
+            op_str = re.sub(r'(?<!/)(\S+)\s*/\s*(\S+)(?!/)', r'mod_div(\1, \2, p)', operation)
+            env = {
+                'x': x,
+                'y': y,
+                'p': p,
+                'torch': torch,
+                'min': torch.minimum,
+                'max': torch.maximum,
+                'mod_div': mod_div
+            }
+            result = eval(op_str, {"__builtins__": {}}, env)
+            result = result % p
+            return x, y, result
+        return op_func
 
 def operation_mod_p_data(operation: str, p: int, eq_token: int, op_token: int):
     """
-    Generates data for the operation x ◦ y (mod p).
-
-    For x: values from 0 to p-1.
-    For y: values from 0 to p-1, unless the operation is exactly "x/y" (to avoid division by zero),
-    in which case y is in [1, p).
-
-    The input examples are built by stacking:
-        [x, op_token, y, eq_token]
-    and the labels are computed using the custom operation provided by the user.
-    """
-    x = torch.arange(0, p)
-    if operation.strip() == "x/y":
-        y = torch.arange(1, p)
-    else:
-        y = torch.arange(0, p)
-    x, y = torch.cartesian_prod(x, y).T
-
-    eq = torch.ones_like(x) * eq_token
-    op = torch.ones_like(x) * op_token
-
-    op_func = generate_operation_func(operation)
-    x, y, labels = op_func(x, y, p)
+    Generates data for an operation modulo p.
     
-    # Ensure labels are of type Long for use with CrossEntropyLoss
-    labels = labels.to(torch.long)
-
-    inputs = torch.stack([x, op, y, eq], dim=1)
-
+    - For two-component operations (using only x and y), it creates a Cartesian product
+      of values for x and y (with special handling for "x/y" to avoid division by zero).
+      Inputs are packed as [x, op_token, y, eq_token].
+      
+    - For three-component operations (if the operation string contains "z"),
+      it creates a Cartesian product for x, y, and z, and packs the inputs as
+      [x, op_token, y, op_token, z, eq_token].
+    """
+    if 'z' in operation:
+        # Three-component case: x, y, and z all range from 0 to p-1.
+        x = torch.arange(0, p)
+        y = torch.arange(0, p)
+        z = torch.arange(0, p)
+        x, y, z = torch.cartesian_prod(x, y, z).T
+        op_func = generate_operation_func(operation)
+        x, y, z, labels = op_func(x, y, z, p)
+        labels = labels.to(torch.long)
+        op = torch.ones_like(x) * op_token
+        eq = torch.ones_like(x) * eq_token
+        # Pack as: [x, op_token, y, op_token, z, eq_token]
+        inputs = torch.stack([x, op, y, op, z, eq], dim=1)
+    else:
+        # Two-component case as before.
+        x = torch.arange(0, p)
+        if operation.strip() == "x/y":
+            y = torch.arange(1, p)
+        else:
+            y = torch.arange(0, p)
+        x, y = torch.cartesian_prod(x, y).T
+        op_func = generate_operation_func(operation)
+        x, y, labels = op_func(x, y, p)
+        labels = labels.to(torch.long)
+        op = torch.ones_like(x) * op_token
+        eq = torch.ones_like(x) * eq_token
+        inputs = torch.stack([x, op, y, eq], dim=1)
     return inputs, labels
 
 def get_data(operation: str, prime: int, training_fraction: float, batch_size: int):
     """
     Generates training and validation data loaders for a custom operation modulo a prime.
     
-    The operation is specified as a string (e.g. "x+min(x,y)") and is evaluated
-    to compute the label for each (x, y) pair.
+    The operation is specified as a string (e.g. "x+min(x,y)" or "x+y+z") and is evaluated
+    to compute the label for each input tuple.
     
     The eq_token and op_token are set to prime and prime+1 respectively.
+    This function works with either two- or three-component tasks.
     """
     inputs, labels = operation_mod_p_data(operation, prime, prime, prime+1)
     dataset = torch.utils.data.TensorDataset(inputs, labels)
@@ -103,7 +126,6 @@ def get_data(operation: str, prime: int, training_fraction: float, batch_size: i
     val_size = len(dataset) - train_size
 
     train_dataset, val_dataset = torch.utils.data.random_split(dataset, [train_size, val_size])
-
     batch_size = min(batch_size, ceil(len(dataset) / 2))
 
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
